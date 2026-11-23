@@ -1,0 +1,14 @@
+# Source archives
+Source/
+*.zip
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Logs
+*.log
+
+# Node (if any)
+node_modules/
