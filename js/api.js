@@ -211,6 +211,7 @@
         html += '<div class="product__item">';
         html += '<a class="product__item__pic" href="' + detailUrl + '">';
         html += '<img src="' + esc(posterFull) + '" alt="' + esc(title) + '" loading="lazy"' +
+            ' data-anime-id="' + esc(id) + '"' +
             (fallback ? ' onerror="' + fallback + '"' : '') + '>';
         if (episodes) html += '<div class="ep">' + esc(episodes) + '</div>';
         if (rating) html += '<div class="view"><i class="fa fa-star"></i> ' + esc(rating) + '</div>';
@@ -386,6 +387,26 @@
         });
     }
 
+    function enrichUnlimitedPosters(target, rows) {
+        if (!rows || !rows.length || isDemo()) return;
+
+        rows.forEach(function (item) {
+            var f = cfg().fields || {};
+            var id = readField(item, f.id) || item.slug || item.animeId || item.id || '';
+            if (!id) return;
+
+            request('detail', { id: id }).then(function (response) {
+                var data = unwrap(response, cfg().dataPath) || {};
+                var poster = readField(data, f.poster) || data.poster || data.thumb || '';
+                if (!poster) return;
+
+                var selector = 'img[data-anime-id=\"' + String(id).replace(/\"/g, '\\\\\"') + '\"]';
+                var img = target.querySelector(selector);
+                if (img) img.src = posterHi(poster);
+            }).catch(function () {});
+        });
+    }
+
     function renderRows(target, options, onDone) {
         target.innerHTML = statusHtml('Memuat data dari API...');
 
@@ -404,6 +425,7 @@
 
             var render = pickRenderer(options.type);
             target.innerHTML = rows.map(render).join('');
+            if (!isDemo() && options.endpoint === 'all') enrichUnlimitedPosters(target, rows);
             if (typeof onDone === 'function') onDone(rows, total);
         }).catch(function (error) {
             target.innerHTML = errorHtml(error);
