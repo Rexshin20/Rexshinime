@@ -387,51 +387,6 @@
         });
     }
 
-    function enrichUnlimitedPosters(target, rows) {
-        if (!rows || !rows.length || isDemo()) return;
-
-        var f = cfg().fields || {};
-        var queue = rows.slice();
-        var active = 0;
-        var concurrency = 1;
-
-        function scheduleNext() {
-            setTimeout(processQueue, 250);
-        }
-
-        function processQueue() {
-            while (active < concurrency && queue.length) {
-                var item = queue.shift();
-                active++;
-
-                (function (currentItem) {
-                    var id = readField(currentItem, f.id) || currentItem.slug || currentItem.animeId || currentItem.id || '';
-                    if (!id) {
-                        active--;
-                        if (queue.length) scheduleNext();
-                        return;
-                    }
-
-                    request('detail', { id: id }).then(function (response) {
-                        var data = unwrap(response, cfg().dataPath) || {};
-                        var poster = readField(data, f.poster) || data.poster || data.thumb || '';
-                        if (poster) {
-                            var selector = 'img[data-anime-id="' + String(id).replace(/"/g, '\\"') + '"]';
-                            var img = target.querySelector(selector);
-                            if (img) img.src = posterHi(poster);
-                        }
-                    }).catch(function () {
-                    }).then(function () {
-                        active--;
-                        if (queue.length) scheduleNext();
-                    });
-                })(item);
-            }
-        }
-
-        processQueue();
-    }
-
     function renderRows(target, options, onDone) {
         target.innerHTML = statusHtml('Memuat data dari API...');
 
@@ -450,7 +405,6 @@
 
             var render = pickRenderer(options.type);
             target.innerHTML = rows.map(render).join('');
-            if (!isDemo() && options.endpoint === 'all') enrichUnlimitedPosters(target, rows);
             if (typeof onDone === 'function') onDone(rows, total);
         }).catch(function (error) {
             target.innerHTML = errorHtml(error);
