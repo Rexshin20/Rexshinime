@@ -390,21 +390,46 @@
     function enrichUnlimitedPosters(target, rows) {
         if (!rows || !rows.length || isDemo()) return;
 
-        rows.forEach(function (item) {
-            var f = cfg().fields || {};
-            var id = readField(item, f.id) || item.slug || item.animeId || item.id || '';
-            if (!id) return;
+        var f = cfg().fields || {};
+        var queue = rows.slice();
+        var active = 0;
+        var concurrency = 1;
 
-            request('detail', { id: id }).then(function (response) {
-                var data = unwrap(response, cfg().dataPath) || {};
-                var poster = readField(data, f.poster) || data.poster || data.thumb || '';
-                if (!poster) return;
+        function scheduleNext() {
+            setTimeout(processQueue, 250);
+        }
 
-                var selector = 'img[data-anime-id=\"' + String(id).replace(/\"/g, '\\\\\"') + '\"]';
-                var img = target.querySelector(selector);
-                if (img) img.src = posterHi(poster);
-            }).catch(function () {});
-        });
+        function processQueue() {
+            while (active < concurrency && queue.length) {
+                var item = queue.shift();
+                active++;
+
+                (function (currentItem) {
+                    var id = readField(currentItem, f.id) || currentItem.slug || currentItem.animeId || currentItem.id || '';
+                    if (!id) {
+                        active--;
+                        if (queue.length) scheduleNext();
+                        return;
+                    }
+
+                    request('detail', { id: id }).then(function (response) {
+                        var data = unwrap(response, cfg().dataPath) || {};
+                        var poster = readField(data, f.poster) || data.poster || data.thumb || '';
+                        if (poster) {
+                            var selector = 'img[data-anime-id="' + String(id).replace(/"/g, '\\"') + '"]';
+                            var img = target.querySelector(selector);
+                            if (img) img.src = posterHi(poster);
+                        }
+                    }).catch(function () {
+                    }).then(function () {
+                        active--;
+                        if (queue.length) scheduleNext();
+                    });
+                })(item);
+            }
+        }
+
+        processQueue();
     }
 
     function renderRows(target, options, onDone) {
